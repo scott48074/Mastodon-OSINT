@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
 """
+from bs4 import BeautifulSoup
+from collections import Counter
 from mastodon import Mastodon
 from pathlib import Path
+from textblob import TextBlob
 
 API_BASE_URL = 'https://noagendasocial.com'
 
@@ -34,9 +37,26 @@ def create_instance():
     mastodon = Mastodon(
         client_id='app.secret',
         access_token='user.secret',
-        api_base_url=API_BASE_URL
+        api_base_url=API_BASE_URL,
+        ratelimit_method='wait'
     )
     return mastodon
+
+
+def get_toot_sentiment(toot):
+        '''
+        Utility function to classify sentiment of passed toots
+        using textblob's sentiment method
+        '''
+        # create TextBlob object of passed toot text
+        analysis = TextBlob(toot)
+        # set sentiment
+        if analysis.sentiment.polarity > 0:
+            return 'positive'
+        elif analysis.sentiment.polarity == 0:
+            return 'neutral'
+        else:
+            return 'negative'
 
 
 def main():
@@ -54,7 +74,20 @@ def main():
             success = login(email, password)
 
     mastodon = create_instance()
-    mastodon.toot('Checking to make sure app is only registered once.')
+    for key, val in mastodon.account(1).items():
+        print(key, val)
+
+    print('#' * 50, '\n')
+
+    sentiment = list()
+    for toot in mastodon.account_statuses(1):
+        soup = BeautifulSoup(toot['content'], 'html.parser')
+        sentiment.append(get_toot_sentiment(soup.get_text()))
+
+    results = Counter(sentiment)
+    print(results['negative']/len(sentiment), 'Negative toots')
+    print(results['positive']/len(sentiment), 'Positive toots')
+    print(results['neutral']/len(sentiment), 'Neutral toots')
 
 
 if __name__ == '__main__':
